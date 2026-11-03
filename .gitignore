@@ -1,0 +1,10 @@
+# Bí mật / cấu hình máy cá nhân (nếu sau này dùng clasp hoặc .env)
+.env
+.env.*
+.clasp.json
+.clasprc.json
+
+# Kết quả chẩn đoán, file tạm
+chan-doan*.txt
+*.log
+.DS_Store
