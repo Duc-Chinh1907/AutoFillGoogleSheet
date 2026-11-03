@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Đơn Zalo → Google Sheet
 // @namespace    rea-don-zalo
-// @version      1.0.0
+// @version      1.1.0
 // @description  Đọc tin nhắn đang hiển thị trong nhóm Zalo Web và gửi lên Google Sheet. CHỈ ĐỌC: không gửi tin, không bấm gì trong Zalo.
 // @match        https://chat.zalo.me/*
 // @grant        GM_xmlhttpRequest
@@ -13,7 +13,12 @@
 // @connect      script.googleusercontent.com
 // @run-at       document-idle
 // @noframes
+// @homepageURL  https://github.com/Duc-Chinh1907/AutoFillGoogleSheet
+// @updateURL    https://raw.githubusercontent.com/Duc-Chinh1907/AutoFillGoogleSheet/main/userscript/zalo-don-hang.user.js
+// @downloadURL  https://raw.githubusercontent.com/Duc-Chinh1907/AutoFillGoogleSheet/main/userscript/zalo-don-hang.user.js
 // ==/UserScript==
+
+// Tampermonkey tự cập nhật từ GitHub chỉ khi @version tăng: mỗi lần sửa file này nhớ tăng @version.
 
 /*
  * Cách hoạt động: anh mở nhóm đơn trên chat.zalo.me và cuộn qua các tin cần lấy. Script đọc

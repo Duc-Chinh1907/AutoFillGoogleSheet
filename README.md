@@ -80,8 +80,11 @@ Lấy đơn CTV gửi trong nhóm Zalo và ghi vào Google Sheet, thay cho việ
 
 1. Vào Chrome Web Store, tìm **Tampermonkey** và bấm **Thêm vào Chrome**.
 2. Mở địa chỉ `chrome://extensions`, bấm **Chi tiết** ở Tampermonkey, rồi bật **Cho phép tập lệnh của người dùng** (*Allow User Scripts*). Nếu không thấy mục này, bật **Chế độ dành cho nhà phát triển** ở góc trên bên phải.
-3. Bấm biểu tượng Tampermonkey (🧩 → Tampermonkey) và chọn **Bảng điều khiển** (*Dashboard*), rồi bấm dấu **+** để tạo script mới.
-4. Xóa hết nội dung mẫu. Mở file `userscript/zalo-don-hang.user.js`, chép toàn bộ và dán vào. Bấm **Tệp → Lưu** (**Cmd+S**).
+3. Mở link sau trong Chrome:
+   https://raw.githubusercontent.com/Duc-Chinh1907/AutoFillGoogleSheet/main/userscript/zalo-don-hang.user.js
+4. Tampermonkey sẽ hiện trang cài đặt script. Bấm **Cài đặt** (*Install*). Nếu đã cài trước đó thì nút sẽ là **Cập nhật** hoặc **Cài đặt lại**.
+
+Cài từ link này thì Tampermonkey **tự cập nhật** khi có bản mới trên GitHub (mặc định kiểm tra mỗi ngày), anh không phải dán code nữa.
 
 (Firefox và Edge cũng có Tampermonkey, làm tương tự.)
 
@@ -187,7 +190,7 @@ Muốn chỉnh quy tắc (vd. đổi 5 phút) thì sửa phần `CONFIG` ở đ�
 ## Cập nhật code
 
 - **Apps Script**: dán code mới, Lưu, rồi vào **Triển khai → Quản lý các bản triển khai → ✏️ → Phiên bản: Phiên bản mới → Triển khai**. URL giữ nguyên. Nếu chọn "Triển khai mới" thì sẽ ra URL mới.
-- **Userscript**: mở Tampermonkey Dashboard, bấm vào script, dán đè nội dung mới và Lưu. Cài đặt đã nhập vẫn giữ nguyên.
+- **Userscript**: tự cập nhật từ GitHub, không cần làm gì. Muốn lấy bản mới ngay thì mở Tampermonkey **Dashboard**, tick ô của script, chọn **Kiểm tra cập nhật** (*Check for userscript updates*) hoặc mở lại link cài ở Bước 5, rồi tải lại trang Zalo. Cài đặt đã nhập vẫn giữ nguyên.
 
 ## Bảo mật
 
