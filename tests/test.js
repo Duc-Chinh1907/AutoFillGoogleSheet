@@ -100,5 +100,31 @@ eq(mergeSnapshot(order, store, [m('a'), m('b'), m('c')]), 2, 'lần quét 2 (cu�
 eq(mergeSnapshot(order, store, [m('d'), m('e'), m('f')]), 1, 'lần quét 3 (cuộn xuống)');
 eq(order, ['a', 'b', 'c', 'd', 'e', 'f'], 'thứ tự đúng');
 
+// --- bỏ chọn ở bảng Xem trước ---
+const skipRes = [
+  { result: 'order', reason: '', keys: ['a'] },
+  { result: 'review', reason: 'x', keys: ['b', 'c'] },
+  { result: 'skip', reason: 'Tin trò chuyện, không phải đơn', keys: ['d'] },
+  { result: 'order', reason: '', keys: ['e'] },
+];
+eq(applyUserSkips_(skipRes, new Set(['a', 'c', 'd'])), 2, 'đếm số đơn bị bỏ chọn (không tính tin vốn đã bỏ qua)');
+eq(skipRes.map(r => r.result), ['skip', 'skip', 'skip', 'order'], 'đơn bỏ chọn chuyển thành bỏ qua, đơn khác giữ nguyên');
+eq(skipRes[1].reason, 'Anh bỏ chọn khi xem trước', 'ghi lý do bỏ chọn (kể cả khi chỉ bỏ chọn 1 tin trong đơn gộp)');
+eq(skipRes[2].reason, 'Tin trò chuyện, không phải đơn', 'tin vốn bỏ qua giữ lý do cũ');
+
+// --- sắp xếp đơn theo ngày ---
+const D = (d) => new Date(2026, 10, d);
+eq(dateOrder_([D(3), D(1), D(2)]), [1, 2, 0], 'sắp theo ngày');
+eq(dateOrder_([D(2), D(1), D(2), D(1)]), [1, 3, 0, 2], 'cùng ngày giữ thứ tự cũ');
+eq(dateOrder_(['', D(1), 'chữ', D(1)]), [1, 3, 0, 2], 'ô trống / không phải ngày xuống cuối');
+eq(dateOrder_([D(1), D(2)]), [0, 1], 'đã đúng thứ tự thì không đổi');
+
+// --- dọn lịch sử _DaXuLy ---
+const CUT = D(10).getTime();
+eq(countExpired_([D(1), D(5), D(10), D(12)], CUT), 2, 'xóa các dòng trước hạn ở đầu danh sách');
+eq(countExpired_([D(1), D(11), D(2)], CUT), 1, 'dừng ở dòng đầu tiên chưa quá hạn');
+eq(countExpired_(['', D(1)], CUT), 0, 'dòng đầu trống thì không xóa gì');
+eq(countExpired_([], CUT), 0, 'tab trống');
+
 print('\n' + passed + ' đạt, ' + failed + ' lỗi');
 if (failed) throw new Error('Có test lỗi');

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Đơn Zalo → Google Sheet
 // @namespace    rea-don-zalo
-// @version      1.2.0
-// @description  Đọc tin nhắn đang hiển thị trong nhóm Zalo Web và gửi lên Google Sheet. CHỈ ĐỌC: không gửi tin, không bấm gì trong Zalo.
+// @version      1.3.0
+// @description  Đọc tin nhắn Zalo Web đã tải trong nhóm đơn và gửi lên Google Sheet. CHỈ ĐỌC: không gửi tin, không bấm gì trong Zalo.
 // @match        https://chat.zalo.me/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
@@ -21,8 +21,9 @@
 // Tampermonkey tự cập nhật từ GitHub chỉ khi @version tăng: mỗi lần sửa file này nhớ tăng @version.
 
 /*
- * Cách hoạt động: anh mở nhóm đơn trên chat.zalo.me và cuộn qua các tin cần lấy. Script đọc
- * các tin đang hiện trên màn hình (người gửi, ngày, giờ, nội dung) và gom lại. Bấm "Xem trước"
+ * Cách hoạt động: anh mở nhóm đơn trên chat.zalo.me, cuộn lên tới đơn cần lấy rồi bấm "Bắt đầu gom".
+ * Script đọc mọi tin Zalo đã tải trong khung chat, kể cả phần chưa cuộn tới (người gửi, ngày, giờ,
+ * nội dung), và gom lại. Bấm "Xem trước"
  * để xem Sheet sẽ ghi gì, bấm "Ghi vào Sheet" để ghi thật.
  *
  * Zalo không công bố cấu trúc trang web, nên các "bộ chọn" bên dưới có thể phải chỉnh khi Zalo
@@ -281,8 +282,8 @@ function main() {
     return '';
   }
 
-  /** Đọc các tin đang có trên màn hình, theo thứ tự từ trên xuống. */
-  function readVisible() {
+  /** Đọc mọi tin Zalo đã tải trong khung chat (không chỉ phần đang thấy), theo thứ tự từ trên xuống. */
+  function readLoaded() {
     const S = sel();
     const box = first(document, S.container);
     const root = box ? box.el : document;
@@ -337,7 +338,7 @@ function main() {
 
   function snapshot() {
     if (!isTargetGroupOpen()) return { added: 0, error: 'Chưa mở đúng nhóm "' + (settings().group || '?') + '".' };
-    const { list, error } = readVisible();
+    const { list, error } = readLoaded();
     if (error) return { added: 0, error };
     return { added: mergeSnapshot(order, store, list), error: '' };
   }
@@ -626,7 +627,7 @@ function main() {
       const counts = S[k].map(s => { try { return s + ' = ' + root.querySelectorAll(s).length; } catch (e) { return s + ' = lỗi'; } });
       report.push(k + ': ' + counts.join(' | '));
     });
-    const { list, error } = readVisible();
+    const { list, error } = readLoaded();
     report.push('Đọc được ' + list.length + ' tin' + (error ? ' – ' + error : ''));
     list.slice(-8).forEach(m => report.push('  • ' + (m.mine ? '(mình)' : (m.sender ? m.sender[0] + '… (' + m.sender.length + ')' : '?')) +
       ' | ngày ' + (m.date || '?') + ' | giờ ' + (m.time || '?') + ' | id ' + (m.msgId ? 'có' : 'không') + ' | ' + m.text.length + ' ký tự'));

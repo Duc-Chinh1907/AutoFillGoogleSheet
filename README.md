@@ -12,7 +12,7 @@ Lấy đơn CTV gửi trong nhóm Zalo và ghi vào Google Sheet, thay cho việ
                                            └──────────────────────────────┘
 ```
 
-- **Chỉ đọc Zalo**: script chỉ đọc chữ đang hiện trên màn hình. Nó không gửi tin, không bấm gì trong nhóm và không gọi máy chủ Zalo.
+- **Chỉ đọc Zalo**: script chỉ đọc chữ các tin Zalo Web đã tải trong trang. Nó không gửi tin, không bấm gì trong nhóm và không gọi máy chủ Zalo.
 - **Chỉ ghi 3 cột**: `Ngày`, `Đơn Hàng` (nguyên văn tin của CTV) và `Tên CTV`. Mã đơn, tổng tiền, chiết khấu... vẫn do công thức của Sheet tự tính.
 - **Không ghi trùng**: tin nào đã xử lý thì lần sau bỏ qua, kể cả khi anh bấm Ghi nhiều lần.
 - **Không đoán bừa**: tin thiếu thông tin được ghi sang tab **Cần kiểm tra** để anh duyệt tay.

@@ -103,16 +103,7 @@ function processMessages_(raw, opts) {
   const ctv = loadCtvMap_(aux.ctvMap);
   const results = classifyMessages_(fresh, ctv.map, CONFIG, getCtvChoices_(main, findHeaders_(main)));
 
-  // Tin anh bỏ chọn ở bảng Xem trước: không ghi, nhưng vẫn đánh dấu đã xử lý để lần sau không hiện lại.
-  const userSkippedKeys = new Set(fresh.filter(m => m.userSkip).map(m => m.key));
-  let userSkipped = 0;
-  results.forEach(r => {
-    if (r.result !== 'skip' && r.keys.some(k => userSkippedKeys.has(k))) {
-      r.result = 'skip';
-      r.reason = 'Anh bỏ chọn khi xem trước';
-      userSkipped++;
-    }
-  });
+  const userSkipped = applyUserSkips_(results, new Set(fresh.filter(m => m.userSkip).map(m => m.key)));
   const orders = results.filter(r => r.result === 'order');
   const reviews = results.filter(r => r.result === 'review');
   const skipped = results.filter(r => r.result === 'skip');
@@ -299,6 +290,38 @@ function resolveCtv_(sender, ctvMap, ctvChoices) {
   return { ctv: ctvChoices ? ctvChoices.get(norm_(mapped)) : mapped, problem: '' };
 }
 
+/**
+ * Tin anh bỏ chọn ở bảng Xem trước: không ghi, nhưng vẫn đánh dấu đã xử lý (skip) để lần sau không hiện lại.
+ * Đổi `results` tại chỗ, trả về số đơn bị bỏ chọn.
+ */
+function applyUserSkips_(results, skippedKeys) {
+  let n = 0;
+  results.forEach(r => {
+    if (r.result !== 'skip' && r.keys.some(k => skippedKeys.has(k))) {
+      r.result = 'skip';
+      r.reason = 'Anh bỏ chọn khi xem trước';
+      n++;
+    }
+  });
+  return n;
+}
+
+/**
+ * Thứ tự sắp xếp theo ngày: trả về danh sách vị trí cũ theo thứ tự mới. Cùng ngày giữ thứ tự cũ,
+ * ô không phải ngày (trống, chữ) xuống cuối.
+ */
+function dateOrder_(dates) {
+  const key = i => (dates[i] instanceof Date ? dates[i].getTime() : Infinity);
+  return Array.from({ length: dates.length }, (_, i) => i).sort((a, b) => key(a) - key(b) || a - b);
+}
+
+/** Số dòng đầu danh sách có thời điểm trước `cutoff` (ms); dừng ở dòng đầu tiên không quá hạn. */
+function countExpired_(times, cutoff) {
+  let n = 0;
+  while (n < times.length && times[n] instanceof Date && times[n].getTime() < cutoff) n++;
+  return n;
+}
+
 function norm_(s) {
   return String(s).normalize('NFC').replace(/\s+/g, ' ').trim().toLowerCase();
 }
@@ -348,14 +371,16 @@ function findHeaders_(sheet) {
   return null;
 }
 
-/** Ghi các đơn vào sau dòng cuối cùng có dữ liệu ở 3 cột Ngày / Đơn Hàng / Tên CTV. Trả về số dòng đã ghi. */
+/**
+ * Ghi các đơn vào sau dòng cuối cùng có dữ liệu ở 3 cột Ngày / Đơn Hàng / Tên CTV, theo thứ tự nhận được
+ * (sortOrdersByDate_ sắp lại cả bảng ngay sau đó). Trả về số dòng đã ghi.
+ */
 function appendOrders_(sheet, orders) {
   const h = findHeaders_(sheet);
   if (!h) throw new Error('Tab "' + sheet.getName() + '" thiếu cột ' + Object.values(CONFIG.HEADERS).join(' / ') + '.');
 
-  const sorted = orders.slice().sort((a, b) => String(dateKey_(a.date)).localeCompare(String(dateKey_(b.date))));
   const start = findNextEmptyRow_(sheet, h);
-  const n = sorted.length;
+  const n = orders.length;
   const limit = formulaRowLimit_(sheet);
   if (start + n - 1 > limit) {
     throw new Error('Tab "' + sheet.getName() + '" chỉ có công thức đến dòng ' + limit + ', không đủ chỗ cho ' + n +
@@ -365,10 +390,10 @@ function appendOrders_(sheet, orders) {
   if (needed > 0) sheet.insertRowsAfter(sheet.getMaxRows(), needed);
 
   // Chỉ ghi 3 cột; các cột công thức (kể cả công thức mảng ở dòng 2) không bị đụng tới.
-  sheet.getRange(start, h.date, n, 1).setValues(sorted.map(o => [toDate_(o.date)]));
-  sheet.getRange(start, h.order, n, 1).setValues(sorted.map(o => [o.text]));
-  sheet.getRange(start, h.ctv, n, 1).setValues(sorted.map(o => [o.ctv]));
-  return sorted.map((o, i) => start + i);
+  sheet.getRange(start, h.date, n, 1).setValues(orders.map(o => [toDate_(o.date)]));
+  sheet.getRange(start, h.order, n, 1).setValues(orders.map(o => [o.text]));
+  sheet.getRange(start, h.ctv, n, 1).setValues(orders.map(o => [o.ctv]));
+  return orders.map((o, i) => start + i);
 }
 
 /**
@@ -385,8 +410,7 @@ function sortOrdersByDate_(sheet, rows) {
 
   const cols = [h.date, h.order, h.ctv];
   const data = cols.map(c => sheet.getRange(first, c, n, 1).getValues());
-  const key = i => (data[0][i][0] instanceof Date ? data[0][i][0].getTime() : Infinity);
-  const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => key(a) - key(b) || a - b);
+  const idx = dateOrder_(data[0].map(r => r[0]));
   if (idx.some((v, i) => v !== i)) {
     cols.forEach((c, k) => sheet.getRange(first, c, n, 1).setValues(idx.map(i => data[k][i])));
   }
@@ -488,11 +512,6 @@ function applyCtvChoicesToMap_(ss) {
   return choices.size;
 }
 
-function dateKey_(d) {
-  if (d instanceof Date) return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  return d || '';
-}
-
 function toDate_(d) {
   if (d instanceof Date) return d;
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
@@ -537,10 +556,8 @@ function markProcessed_(sheet, results) {
 function pruneProcessed_(sheet) {
   const last = sheet.getLastRow();
   if (last < 2) return 0;
-  const cutoff = Date.now() - CONFIG.KEEP_PROCESSED_DAYS * 86400000;
-  const times = sheet.getRange(2, 2, last - 1, 1).getValues();
-  let n = 0;
-  while (n < times.length && times[n][0] instanceof Date && times[n][0].getTime() < cutoff) n++;
+  const times = sheet.getRange(2, 2, last - 1, 1).getValues().map(r => r[0]);
+  const n = countExpired_(times, Date.now() - CONFIG.KEEP_PROCESSED_DAYS * 86400000);
   if (!n) return 0;
   // Không được xóa hết mọi dòng dưới tiêu đề (Sheets báo lỗi), nên trường hợp đó chỉ xóa nội dung.
   if (n >= sheet.getMaxRows() - 1) sheet.getRange(2, 1, n, sheet.getLastColumn()).clearContent();
@@ -651,14 +668,15 @@ function datTabGhiDon() {
 function chuyenDonDaDuyet() {
   const ui = SpreadsheetApp.getUi();
   const ss = getSpreadsheet_();
-  const sheet = ensureAuxSheets_(ss).review;
+  const aux = ensureAuxSheets_(ss);
+  const sheet = aux.review;
   const last = sheet.getLastRow();
   if (last < 2) { ui.alert('Tab Cần kiểm tra đang trống.'); return; }
 
   const col = name => REVIEW_HEADERS.indexOf(name);
   const main = getMainSheet_(ss);
   const choices = getCtvChoices_(main, findHeaders_(main));
-  const ctvMap = loadCtvMap_(ensureAuxSheets_(ss).ctvMap).map;
+  const ctvMap = loadCtvMap_(aux.ctvMap).map;
   const data = sheet.getRange(2, 1, last - 1, REVIEW_HEADERS.length).getValues();
   const picked = [];
   const problems = [];
@@ -688,7 +706,7 @@ function chuyenDonDaDuyet() {
     sortOrdersByDate_(main);
     // Sau khi sắp xếp, số dòng của đơn có thể còn đổi ở lần ghi sau, nên không ghi số dòng ở đây.
     picked.forEach(p => sheet.getRange(p.row, col('Trạng thái') + 1).setValue('Đã chuyển'));
-    appendLog_(ensureAuxSheets_(ss).log, { mode: 'Duyệt tay', written: picked.length, rows: appended });
+    appendLog_(aux.log, { mode: 'Duyệt tay', written: picked.length, rows: appended });
   }
   ui.alert('Đã chuyển ' + picked.length + ' đơn.' + (problems.length ? '\n\nChưa chuyển:\n' + problems.join('\n') : ''));
 }
