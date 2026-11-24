@@ -83,7 +83,12 @@ function dbOpen_() {
   try {
     return SpreadsheetApp.openById(id);
   } catch (err) {
-    throw new Error('Tài khoản của anh/chị chưa được chia sẻ Sheet đơn hàng. Nhờ chủ Sheet chia sẻ rồi tải lại trang.');
+    // Ghi rõ tài khoản đang chạy và lỗi gốc: hay gặp nhất là trình duyệt đăng nhập nhiều tài khoản
+    // nên trang chạy bằng tài khoản khác, hoặc chia sẻ nhầm file khác với SPREADSHEET_ID.
+    let who = '';
+    try { who = Session.getActiveUser().getEmail(); } catch (e) { /* không lấy được email thì thôi */ }
+    throw new Error('Tài khoản ' + (who || '(không rõ)') + ' chưa mở được Sheet đơn hàng (mã ' + id + '). ' +
+      'Nhờ chủ Sheet chia sẻ đúng file này cho đúng tài khoản này rồi tải lại trang. Lỗi gốc: ' + (err && err.message || err));
   }
 }
 
