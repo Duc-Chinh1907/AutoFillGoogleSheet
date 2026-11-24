@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Đơn Zalo → Google Sheet
 // @namespace    rea-don-zalo
-// @version      1.1.0
+// @version      1.2.0
 // @description  Đọc tin nhắn đang hiển thị trong nhóm Zalo Web và gửi lên Google Sheet. CHỈ ĐỌC: không gửi tin, không bấm gì trong Zalo.
 // @match        https://chat.zalo.me/*
 // @grant        GM_xmlhttpRequest
@@ -550,18 +550,24 @@ function main() {
     }
 
     const heads = (pickable ? ['Chọn'] : []).concat(['Kết quả', 'Ngày', 'Tên Zalo', 'Tên CTV', 'Đơn Hàng', 'Lý do']);
+    const ths = heads.map(t => h('th', { style: cell + ';background:#f0f0f0;position:sticky;z-index:1' }, t));
+    const scroller = h('div', { style: 'background:#fff;color:#111;max-width:95vw;max-height:90vh;overflow:auto;padding:0 12px 12px;border-radius:8px;font:12px/1.4 system-ui,sans-serif' });
+    // Thanh trên cùng luôn hiện khi cuộn bảng: tóm tắt, nút Đóng / Lên đầu và các nút chọn, ghi.
+    const bar = h('div', { style: 'position:sticky;top:0;z-index:2;background:#fff;padding:12px 0 6px;border-bottom:1px solid #ddd' },
+      h('div', { style: 'font-weight:bold;margin-bottom:6px' }, summaryText(d), ' Tab: ', d.mainSheet || ''),
+      h('button', { style: btnStyle, onclick: () => overlay.remove() }, 'Đóng'),
+      h('button', { style: btnStyle, onclick: () => scroller.scrollTo({ top: 0, behavior: 'smooth' }) }, '⬆ Lên đầu'),
+      h('button', { style: btnStyle, onclick: () => scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' }) }, '⬇ Xuống cuối'),
+      tools);
+    scroller.append(bar, h('table', { style: 'border-collapse:collapse;margin-top:6px' }, h('tr', {}, ths), rows));
     const overlay = h('div', {
       style: 'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center',
       onclick: e => { if (e.target === overlay) overlay.remove(); },
-    }, h('div', { style: 'background:#fff;color:#111;max-width:95vw;max-height:90vh;overflow:auto;padding:12px;border-radius:8px;font:12px/1.4 system-ui,sans-serif' },
-      h('div', { style: 'font-weight:bold;margin-bottom:6px' }, summaryText(d), ' Tab: ', d.mainSheet || ''),
-      h('button', { style: btnStyle, onclick: () => overlay.remove() }, 'Đóng'),
-      tools,
-      h('table', { style: 'border-collapse:collapse;margin-top:6px' },
-        h('tr', {}, heads.map(t => h('th', { style: cell + ';background:#f0f0f0' }, t))),
-        rows)));
+    }, scroller);
     overlay.dataset.donZalo = '1';
     document.body.append(overlay);
+    // Dòng tiêu đề bảng dính ngay dưới thanh trên cùng (chiều cao thanh chỉ biết sau khi hiện ra).
+    ths.forEach(th => { th.style.top = bar.offsetHeight + 'px'; });
   }
 
   // ---------- Chẩn đoán: lấy cấu trúc trang, đã che nội dung ----------
