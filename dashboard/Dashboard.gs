@@ -105,7 +105,9 @@ function dbMainSheet_(ss) {
     if (!hit) throw new Error('Không thấy tab "' + name + '" có cột ' + DB.REQUIRED.map(k => DB.COLS[k]).join(' / ') + '.');
     return hit;
   }
-  const hits = ss.getSheets().map(find).filter(Boolean);
+  // Tab Cần kiểm tra cũng có cột Ngày / Đơn Hàng / Tên CTV: không tính các tab phụ khi tự tìm.
+  const aux = [DB.REVIEW_SHEET, DB.CTV_MAP_SHEET, 'Nhật ký', '_DaXuLy'];
+  const hits = ss.getSheets().filter(s => !aux.includes(s.getName())).map(find).filter(Boolean);
   if (hits.length === 1) return hits[0];
   throw new Error(hits.length
     ? 'Có nhiều tab có cột đơn hàng (' + hits.map(h => h.sheet.getName()).join(', ') + '). Đặt MAIN_SHEET_NAME trong Thuộc tính tập lệnh.'

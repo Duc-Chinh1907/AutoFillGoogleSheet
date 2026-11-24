@@ -346,7 +346,9 @@ function getMainSheet_(ss) {
     if (!findHeaders_(sheet)) throw new Error('Tab "' + name + '" thiếu cột ' + Object.values(CONFIG.HEADERS).join(' / ') + '.');
     return sheet;
   }
-  const candidates = ss.getSheets().filter(s => findHeaders_(s));
+  // Tab Cần kiểm tra cũng có cột Ngày / Đơn Hàng / Tên CTV: không tính các tab phụ khi tự tìm.
+  const aux = [CONFIG.REVIEW_SHEET, CONFIG.CTV_MAP_SHEET, CONFIG.LOG_SHEET, CONFIG.PROCESSED_SHEET];
+  const candidates = ss.getSheets().filter(s => !aux.includes(s.getName()) && findHeaders_(s));
   if (candidates.length === 1) return candidates[0];
   throw new Error(candidates.length
     ? 'Có nhiều tab có cột đơn hàng (' + candidates.map(s => s.getName()).join(', ') + '). Mở đúng tab rồi chọn menu Đơn Zalo → "Đặt tab đang mở làm tab ghi đơn".'
