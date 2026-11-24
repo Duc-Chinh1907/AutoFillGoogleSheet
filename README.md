@@ -24,7 +24,6 @@ Lấy đơn CTV gửi trong nhóm Zalo và ghi vào Google Sheet, thay cho việ
 | `apps-script/Code.gs` | Code dán vào Apps Script của Google Sheet |
 | `apps-script/appsscript.json` | Cấu hình dự án (múi giờ Việt Nam). Chỉ cần nếu anh dùng `clasp`, dán tay thì bỏ qua |
 | `userscript/zalo-don-hang.user.js` | Script cài vào Tampermonkey trên Chrome |
-| `dashboard/` | Trang xem đơn trên điện thoại (dự án Apps Script riêng), xem mục **Trang xem đơn trên điện thoại** |
 | `tests/` | Kiểm tra bộ tách đơn: chạy `./tests/run.sh` trong Terminal |
 
 ---
@@ -176,54 +175,6 @@ Tab **Nhật ký** ghi mỗi lần chạy: số tin nhận, số tin trùng, s�
 
 ---
 
-## Trang xem đơn trên điện thoại
-
-Một trang web mở được trên điện thoại, gồm 2 phần:
-
-- **Tổng quan**: chọn ngày để xem số đơn, tổng tiền hàng, tổng chiết khấu và chiết khấu CTV, kèm bảng theo từng CTV.
-- **Cần kiểm tra**: các đơn chờ duyệt. Anh sửa nội dung, chọn Ngày và Tên CTV rồi bấm **Chuyển sang DATA**, hoặc bấm **Bỏ qua**.
-
-Trang chạy bằng tài khoản Google của **người đang xem**. Chỉ người được chia sẻ Sheet mới mở được dữ liệu, người khác có link cũng bị chặn. Trang chỉ đọc Sheet. Khi duyệt, trang nhờ Web App đơn Zalo ghi, nên không bị ghi đè khi Zalo Web cũng đang ghi đơn cùng lúc.
-
-Trang vẫn cần máy tính có Zalo Web để **gom** tin. Trên điện thoại chỉ xem và duyệt.
-
-### Cài đặt (làm một lần, khoảng 10 phút)
-
-1. **Cập nhật Web App đơn Zalo trước**: dán `apps-script/Code.gs` mới vào Apps Script của Sheet, Lưu, rồi **Triển khai → Quản lý các bản triển khai → ✏️ → Phiên bản mới → Triển khai**. Bản mới mới nhận được lệnh duyệt từ điện thoại.
-2. Mở **https://script.google.com** → **Dự án mới**. Đổi tên dự án thành `Đơn Zalo – Điện thoại`.
-3. Ở tệp `Mã.gs` có sẵn: xóa hết, dán toàn bộ `dashboard/Dashboard.gs`, bấm Lưu.
-4. Bấm dấu **+** cạnh **Tệp** → **HTML**, đặt tên đúng là `Index`, xóa nội dung mẫu, dán toàn bộ `dashboard/Index.html`, bấm Lưu.
-5. Vào **⚙️ Cài đặt dự án**:
-   - Tick **Hiển thị tệp kê khai "appsscript.json" trong trình chỉnh sửa**. Quay lại trình chỉnh sửa, mở `appsscript.json`, xóa hết và dán toàn bộ `dashboard/appsscript.json`, bấm Lưu.
-   - Ở mục **Thuộc tính tập lệnh**, bấm **Thêm thuộc tính** 3 lần:
-
-     | Thuộc tính | Giá trị |
-     |---|---|
-     | `SPREADSHEET_ID` | Mã Sheet: đoạn giữa `/d/` và `/edit` trong link Sheet |
-     | `INGEST_URL` | URL Web App đơn Zalo (đang dán trong Cài đặt của userscript, kết thúc bằng `/exec`) |
-     | `API_TOKEN` | Mã bí mật (Sheet → **Đơn Zalo → Xem mã bí mật**) |
-
-     Nếu Sheet có nhiều tab có cột Ngày / Đơn Hàng / Tên CTV, thêm `MAIN_SHEET_NAME` = tên tab đơn hàng (vd. `DATA`).
-6. **Triển khai → Tùy chọn triển khai mới** → ⚙️ chọn **Ứng dụng web**:
-   - **Thực thi với tư cách**: **Người dùng truy cập vào ứng dụng web**.
-   - **Người có quyền truy cập**: **Bất kỳ ai có Tài khoản Google**.
-   - Bấm **Triển khai**, rồi chép **URL ứng dụng web**.
-7. Mở URL đó trên điện thoại, đăng nhập Google, bấm **Cho phép**. Nếu hiện *"Google chưa xác minh ứng dụng này"*, bấm **Nâng cao → Đi tới Đơn Zalo – Điện thoại (không an toàn)**. Đây là script của chính anh nên an toàn.
-8. Trên điện thoại: Safari → nút **Chia sẻ** → **Thêm vào MH chính**. Chrome Android → **⋮ → Thêm vào màn hình chính**. Từ đó trang có biểu tượng như một app.
-
-### Cho người khác dùng
-
-- **Chia sẻ Sheet** cho Gmail của người đó: quyền **Người xem** là đủ để xem và duyệt trên trang. Gửi họ URL ở bước 6, họ làm bước 7–8.
-- Ai được chia sẻ Sheet cũng **duyệt và bỏ qua đơn** được trên trang. Chỉ chia sẻ cho người anh tin.
-- Muốn thu hồi thì bỏ chia sẻ Sheet với người đó. Trang sẽ báo họ không có quyền.
-- Tab **Nhật ký** ghi email người duyệt, cột Trạng thái của tab Cần kiểm tra ghi email người bấm Bỏ qua.
-
-### Khi sửa code trang xem đơn
-
-Dán lại `Dashboard.gs` / `Index.html`, Lưu, rồi **Triển khai → Quản lý các bản triển khai → ✏️ → Phiên bản mới → Triển khai**. URL giữ nguyên.
-
----
-
 ## Script nhận ra đơn bằng cách nào
 
 - **Là đơn** khi tin có ít nhất một **dòng món** **và** có ít nhất một trong: **SĐT**, **link Google Maps**, hoặc chữ **Ship**.
@@ -240,12 +191,11 @@ Muốn chỉnh quy tắc (vd. đổi 5 phút) thì sửa phần `CONFIG` ở đ�
 
 - **Apps Script**: dán code mới, Lưu, rồi vào **Triển khai → Quản lý các bản triển khai → ✏️ → Phiên bản: Phiên bản mới → Triển khai**. URL giữ nguyên. Nếu chọn "Triển khai mới" thì sẽ ra URL mới.
 - **Userscript**: tự cập nhật từ GitHub, không cần làm gì. Muốn lấy bản mới ngay thì mở Tampermonkey **Dashboard**, tick ô của script, ở ô **Áp dụng vào tất cả tập lệnh được chọn** chọn **Khởi động cập nhật** rồi bấm **Bắt đầu** (hoặc mở lại link cài ở Bước 5), rồi tải lại trang Zalo. Cài đặt đã nhập vẫn giữ nguyên.
-- **Trang xem đơn**: xem mục **Trang xem đơn trên điện thoại → Khi sửa code trang xem đơn**.
 
 ## Bảo mật
 
 - Mã bí mật nằm trong **Thuộc tính tập lệnh** của Apps Script, không nằm trong code. URL và mã ở phía trình duyệt nằm trong bộ nhớ của Tampermonkey. Trong thư mục này **không có file nào chứa bí mật**, và `.gitignore` đã chặn `.env` và các file cấu hình cá nhân.
-- Nếu lỡ để lộ mã: chọn **Đơn Zalo → Tạo mã bí mật mới**, rồi nhập lại trong **Cài đặt** của userscript và ở thuộc tính `API_TOKEN` của trang xem đơn.
+- Nếu lỡ để lộ mã: chọn **Đơn Zalo → Tạo mã bí mật mới**, rồi nhập lại trong **Cài đặt** của userscript.
 - Trang Zalo là dữ liệu không tin cậy. Script chỉ hiển thị tin bằng chữ thường, không chạy nội dung tin nhắn như code.
 
 ## Giới hạn và rủi ro (đọc trước khi dùng)

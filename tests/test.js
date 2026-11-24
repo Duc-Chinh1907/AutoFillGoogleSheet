@@ -1,7 +1,6 @@
 // Chạy: ./tests/run.sh  (dùng JavaScriptCore có sẵn trên macOS, không cần cài gì)
-// Kiểm tra các hàm thuần trong apps-script/Code.gs, dashboard/Dashboard.gs và userscript/zalo-don-hang.user.js.
+// Kiểm tra các hàm thuần trong apps-script/Code.gs và userscript/zalo-don-hang.user.js.
 load('apps-script/Code.gs');
-load('dashboard/Dashboard.gs');
 load('userscript/zalo-don-hang.user.js');
 
 let passed = 0;
@@ -126,27 +125,6 @@ eq(countExpired_([D(1), D(5), D(10), D(12)], CUT), 2, 'xóa các dòng trước 
 eq(countExpired_([D(1), D(11), D(2)], CUT), 1, 'dừng ở dòng đầu tiên chưa quá hạn');
 eq(countExpired_(['', D(1)], CUT), 0, 'dòng đầu trống thì không xóa gì');
 eq(countExpired_([], CUT), 0, 'tab trống');
-
-// --- trang xem đơn (dashboard) ---
-eq(dbFindCols_(['Ngày', 'Mã Đơn ID', 'Đơn Hàng', 'Tổng tiền hàng', 'Tổng chiết khấu', 'Tên CTV', 'Chiết khấu (CTV)']),
-  { date: 0, order: 2, ctv: 5, total: 3, discount: 4, ctvDiscount: 6 }, 'tìm đủ các cột theo tiêu đề');
-eq(dbFindCols_([' ngày ', 'ĐƠN HÀNG', 'Tên  CTV']), { date: 0, order: 1, ctv: 2, total: -1, discount: -1, ctvDiscount: -1 },
-  'tiêu đề khác hoa/thường, thừa dấu cách vẫn nhận; cột không bắt buộc thiếu thì -1');
-eq(dbFindCols_(['Ngày', 'Đơn Hàng']), null, 'thiếu cột bắt buộc (Tên CTV) → null');
-
-const DAY_ROWS = [
-  { day: '2026-11-24', ctv: 'Lan', total: 100000, discount: 10000, ctvDiscount: 8000 },
-  { day: '2026-11-24', ctv: 'Minh', total: 200000, discount: 20000, ctvDiscount: 20000 },
-  { day: '2026-11-24', ctv: 'Lan', total: 50000, discount: '', ctvDiscount: '#N/A' },
-  { day: '2026-11-24', ctv: '', total: 30000, discount: 3000, ctvDiscount: 2400 },
-  { day: '2026-11-23', ctv: 'Lan', total: 999000, discount: 1, ctvDiscount: 1 },
-];
-const SUM = dbSummarize_(DAY_ROWS, '2026-11-24');
-eq([SUM.count, SUM.total, SUM.discount, SUM.ctvDiscount], [4, 380000, 33000, 30400], 'tổng một ngày (ô trống / lỗi tính 0, bỏ ngày khác)');
-eq(SUM.byCtv.map(r => [r.ctv, r.count, r.total, r.ctvDiscount]),
-  [['Minh', 1, 200000, 20000], ['Lan', 2, 150000, 8000], ['(chưa có tên)', 1, 30000, 2400]], 'theo CTV, xếp theo chiết khấu CTV giảm dần');
-eq(dbSummarize_(DAY_ROWS, '2026-11-01').count, 0, 'ngày không có đơn');
-eq(dbUniqueNames_(['Lan', ' lan ', '', 'Ánh', 'Minh', 'Minh']), ['Ánh', 'Lan', 'Minh'], 'danh sách tên CTV: bỏ trùng, bỏ trống, xếp A→Z');
 
 print('\n' + passed + ' đạt, ' + failed + ' lỗi');
 if (failed) throw new Error('Có test lỗi');
