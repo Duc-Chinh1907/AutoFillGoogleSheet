@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #fff; --text: #16202c; --muted: #637083; --line: #dfe4ea;
+    --accent: #0068ff; --accent-text: #fff; --ok: #12813a; --warn: #a15c00; --err: #c0262d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11161c; --card: #1a2129; --text: #e6ebf0; --muted: #98a4b3; --line: #2c3540;
+      --accent: #4c8dff; --accent-text: #fff; --ok: #4cc67a; --warn: #f0a640; --err: #ff6b6b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--card); border-bottom: 1px solid var(--line); padding: 10px 16px 0; }
+  h1 { margin: 0 0 8px; font-size: 18px; }
+  nav { display: flex; gap: 4px; }
+  nav button { flex: 1; padding: 10px 4px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+  nav button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  main { padding: 12px 16px 40px; max-width: 720px; margin: 0 auto; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row > * { min-width: 0; }
+  .grow { flex: 1; }
+  input, select, textarea, button { font: inherit; color: var(--text); }
+  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  textarea { min-height: 120px; resize: vertical; }
+  .btn { padding: 9px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); cursor: pointer; white-space: nowrap; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .card .label { color: var(--muted); font-size: 13px; }
+  .card .value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+  th { color: var(--muted); font-size: 13px; font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: 0; }
+  .review { margin-bottom: 12px; display: grid; gap: 8px; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .reason { color: var(--warn); font-size: 13px; }
+  .msg { margin: 10px 0; padding: 10px 12px; border-radius: 8px; background: var(--card); border: 1px solid var(--line); }
+  .msg.err { border-color: var(--err); color: var(--err); }
+  .msg.ok { border-color: var(--ok); color: var(--ok); }
+  .empty { color: var(--muted); text-align: center; padding: 24px 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📋 Đơn Zalo</h1>
+  <nav role="tablist">
+    <button role="tab" id="tab-overview" aria-selected="true">Tổng quan</button>
+    <button role="tab" id="tab-review" aria-selected="false">Cần kiểm tra</button>
+  </nav>
+</header>
+<main>
+  <div id="flash" class="msg" hidden></div>
+
+  <section id="overview">
+    <div class="row">
+      <button class="btn" id="prev" aria-label="Ngày trước">‹</button>
+      <input type="date" id="day" class="grow">
+      <button class="btn" id="next" aria-label="Ngày sau">›</button>
+      <button class="btn" id="reload1" aria-label="Tải lại">↻</button>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="label">Số đơn</div><div class="value" id="v-count">–</div></div>
+      <div class="card"><div class="label">Tổng tiền hàng</div><div class="value" id="v-total">–</div></div>
+      <div class="card"><div class="label">Tổng chiết khấu</div><div class="value" id="v-discount">–</div></div>
+      <div class="card"><div class="label">Chiết khấu CTV</div><div class="value" id="v-ctv">–</div></div>
+    </div>
+    <div id="missing" class="meta" hidden></div>
+    <table>
+      <thead><tr><th>CTV</th><th class="num">Đơn</th><th class="num">Tiền hàng</th><th class="num">CK CTV</th></tr></thead>
+      <tbody id="by-ctv"></tbody>
+    </table>
+  </section>
+
+  <section id="review" hidden>
+    <div class="row" style="margin-bottom:12px">
+      <div class="grow meta" id="review-count"></div>
+      <button class="btn" id="reload2">↻ Tải lại</button>
+    </div>
+    <div id="review-list"></div>
+  </section>
+</main>
+
+<script>
+  // Chỉ dùng textContent / value để hiện dữ liệu từ Sheet (nội dung tin nhắn), không chèn HTML.
+  const $ = id => document.getElementById(id);
+  const money = n => Math.round(Number(n) || 0).toLocaleString('vi-VN') + ' ₫';
+  const vnDate = d => (d ? d.split('-').reverse().join('/') : '?');
+  let days = [];
+  let choices = [];
+
+  function el(tag, props, ...kids) {
+    const e = document.createElement(tag);
+    Object.assign(e, props || {});
+    kids.flat().forEach(k => e.append(k instanceof Node ? k : document.createTextNode(String(k))));
+    return e;
+  }
+
+  function flash(text, kind) {
+    const f = $('flash');
+    f.textContent = text;
+    f.className = 'msg' + (kind ? ' ' + kind : '');
+    f.hidden = !text;
+  }
+
+  function call(fn, arg) {
+    return new Promise((resolve, reject) => {
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(e => reject(e && e.message ? e.message : String(e)))[fn](arg);
+    });
+  }
+
+  // ---------- Tab ----------
+  function showTab(name) {
+    ['overview', 'review'].forEach(t => {
+      $(t).hidden = t !== name;
+      $('tab-' + t).setAttribute('aria-selected', String(t === name));
+    });
+    flash('');
+    if (name === 'review') loadReview(); else loadOverview($('day').value);
+  }
+  $('tab-overview').onclick = () => showTab('overview');
+  $('tab-review').onclick = () => showTab('review');
+
+  // ---------- Tổng quan ----------
+  async function loadOverview(day) {
+    flash('Đang tải…');
+    try {
+      const d = await call('layTongQuan', day || '');
+      days = d.days;
+      $('day').value = d.day;
+      $('v-count').textContent = d.count;
+      $('v-total').textContent = money(d.total);
+      $('v-discount').textContent = money(d.discount);
+      $('v-ctv').textContent = money(d.ctvDiscount);
+      $('missing').hidden = !d.missing.length;
+      $('missing').textContent = d.missing.length ? 'Tab đơn hàng không có cột: ' + d.missing.join(', ') : '';
+      const body = $('by-ctv');
+      body.replaceChildren(...(d.byCtv.length
+        ? d.byCtv.map(r => el('tr', {}, el('td', {}, r.ctv), el('td', { className: 'num' }, r.count),
+            el('td', { className: 'num' }, money(r.total)), el('td', { className: 'num' }, money(r.ctvDiscount))))
+        : [el('tr', {}, el('td', { colSpan: 4, className: 'empty' }, 'Ngày ' + vnDate(d.day) + ' chưa có đơn.'))]));
+      flash('');
+    } catch (e) {
+      flash(e, 'err');
+    }
+  }
+  // ‹ › nhảy tới ngày có đơn gần nhất (danh sách days xếp mới → cũ)
+  $('prev').onclick = () => { const d = days.find(x => x < $('day').value); if (d) loadOverview(d); };
+  $('next').onclick = () => { const d = days.slice().reverse().find(x => x > $('day').value); if (d) loadOverview(d); };
+  $('day').onchange = () => loadOverview($('day').value);
+  $('reload1').onclick = () => loadOverview($('day').value);
+
+  // ---------- Cần kiểm tra ----------
+  async function loadReview() {
+    flash('Đang tải…');
+    try {
+      const d = await call('layCanKiemTra');
+      choices = d.choices;
+      $('review-list').replaceChildren(...d.rows.map(reviewCard));
+      updateReviewCount();
+      flash('');
+    } catch (e) {
+      flash(e, 'err');
+    }
+  }
+
+  function updateReviewCount() {
+    const n = $('review-list').children.length;
+    $('review-count').textContent = n ? n + ' đơn chờ duyệt' : '';
+    $('tab-review').textContent = 'Cần kiểm tra' + (n ? ' (' + n + ')' : '');
+    if (!n) $('review-list').replaceChildren(el('div', { className: 'empty' }, 'Không có đơn nào cần kiểm tra 🎉'));
+  }
+
+  function reviewCard(r) {
+    const date = el('input', { type: 'date', value: r.date });
+    const ctv = el('select', {}, el('option', { value: '' }, '— Chọn Tên CTV —'),
+      choices.map(n => el('option', { value: n, selected: n === r.ctv }, n)));
+    if (r.ctv && !choices.includes(r.ctv)) ctv.append(el('option', { value: r.ctv, selected: true }, r.ctv + ' (không có trong danh sách)'));
+    const text = el('textarea', { value: r.text });
+    const go = el('button', { className: 'btn primary grow' }, 'Chuyển sang DATA');
+    const skip = el('button', { className: 'btn' }, 'Bỏ qua');
+    const card = el('div', { className: 'card review' },
+      el('div', { className: 'meta' }, vnDate(r.date) + (r.time ? ' ' + r.time : '') + ' · ' + (r.sender || '?')),
+      r.reason ? el('div', { className: 'reason' }, r.reason) : '',
+      text,
+      el('div', { className: 'row' }, el('div', { className: 'grow' }, date), el('div', { className: 'grow' }, ctv)),
+      el('div', { className: 'row' }, go, skip));
+
+    async function act(fn, payload, confirmText) {
+      if (confirmText && !confirm(confirmText)) return;
+      go.disabled = skip.disabled = true;
+      try {
+        const res = await call(fn, Object.assign({ row: r.row, receivedAt: r.receivedAt }, payload));
+        if (fn === 'duyetDon' && !res.moved) {
+          flash('Chưa chuyển: ' + (res.problems.join('; ') || 'kiểm tra lại Ngày, Tên CTV, Đơn Hàng.'), 'err');
+          return;
+        }
+        card.remove();
+        updateReviewCount();
+        flash(fn === 'duyetDon' ? '✓ Đã chuyển sang DATA.' : '✓ Đã bỏ qua.', 'ok');
+      } catch (e) {
+        flash(e, 'err');
+      } finally {
+        go.disabled = skip.disabled = false;
+      }
+    }
+    go.onclick = () => {
+      if (!date.value || !ctv.value || !text.value.trim()) { flash('Cần đủ Ngày, Tên CTV và nội dung đơn.', 'err'); return; }
+      act('duyetDon', { date: date.value, ctv: ctv.value, text: text.value });
+    };
+    skip.onclick = () => act('boQuaDon', {}, 'Bỏ qua đơn này? Đơn sẽ không được ghi vào DATA.');
+    return card;
+  }
+  $('reload2').onclick = loadReview;
+
+  loadOverview('');
+  call('layCanKiemTra').then(d => { // hiện số đơn chờ duyệt trên tab ngay từ đầu
+    const n = d.rows.length;
+    $('tab-review').textContent = 'Cần kiểm tra' + (n ? ' (' + n + ')' : '');
+  }).catch(() => {});
+</script>
+</body>
+</html>

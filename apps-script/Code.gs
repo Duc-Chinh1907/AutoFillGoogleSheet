@@ -50,7 +50,8 @@ function doPost(e) {
   if (!token || body.token !== token) {
     return json_({ ok: false, error: 'Sai mã bí mật (token). Kiểm tra lại phần Cài đặt của userscript.' });
   }
-  if (!Array.isArray(body.messages)) {
+  const isReview = body.action === 'review'; // duyệt / bỏ qua đơn từ trang xem đơn trên điện thoại
+  if (!isReview && !Array.isArray(body.messages)) {
     return json_({ ok: false, error: 'Thiếu danh sách tin nhắn.' });
   }
 
@@ -59,13 +60,15 @@ function doPost(e) {
     return json_({ ok: false, error: 'Đang có lần chạy khác, thử lại sau ít giây.' });
   }
   try {
+    if (isReview) return json_(reviewAction_(body));
     const result = processMessages_(body.messages, { dryRun: !!body.dryRun, group: String(body.group || '') });
     console.log(JSON.stringify(Object.assign({}, result, { details: undefined })));
     return json_(result);
   } catch (err) {
     console.error(err);
     try {
-      appendLog_(ensureAuxSheets_(getSpreadsheet_()).log, { mode: body.dryRun ? 'Xem trước' : 'Ghi', error: String(err) });
+      appendLog_(ensureAuxSheets_(getSpreadsheet_()).log,
+        { mode: isReview ? 'Duyệt trên điện thoại' : body.dryRun ? 'Xem trước' : 'Ghi', error: String(err) });
     } catch (ignored) { /* không ghi được log thì thôi, vẫn trả lỗi về */ }
     return json_({ ok: false, error: String(err && err.message || err) });
   } finally {
@@ -665,13 +668,32 @@ function datTabGhiDon() {
   ui.alert('Đã đặt tab ghi đơn là "' + sheet.getName() + '".');
 }
 
+/**
+ * Chạy fn khi đang giữ khóa chung với Web App, để menu không ghi tab đơn hàng cùng lúc với
+ * Zalo Web hay trang xem đơn (hai bên cùng tìm "dòng trống tiếp theo" sẽ ghi đè lên nhau).
+ */
+function withLock_(fn) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) throw new Error('Đang có lần ghi khác, thử lại sau ít giây.');
+  try { return fn(); } finally { lock.releaseLock(); }
+}
+
 function chuyenDonDaDuyet() {
   const ui = SpreadsheetApp.getUi();
-  const ss = getSpreadsheet_();
+  const r = withLock_(() => transferReviews_(getSpreadsheet_(), 0, 'Duyệt tay'));
+  ui.alert(r.empty ? 'Tab Cần kiểm tra đang trống.'
+    : 'Đã chuyển ' + r.moved + ' đơn.' + (r.problems.length ? '\n\nChưa chuyển:\n' + r.problems.join('\n') : ''));
+}
+
+/**
+ * Chuyển các dòng đã tick Duyệt (và chưa có Trạng thái) ở tab Cần kiểm tra sang tab đơn hàng.
+ * onlyRow: chỉ xét dòng này (duyệt trên điện thoại); 0 = mọi dòng. Trả về { empty, moved, problems }.
+ */
+function transferReviews_(ss, onlyRow, mode) {
   const aux = ensureAuxSheets_(ss);
   const sheet = aux.review;
   const last = sheet.getLastRow();
-  if (last < 2) { ui.alert('Tab Cần kiểm tra đang trống.'); return; }
+  if (last < 2) return { empty: true, moved: 0, problems: [] };
 
   const col = name => REVIEW_HEADERS.indexOf(name);
   const main = getMainSheet_(ss);
@@ -681,6 +703,7 @@ function chuyenDonDaDuyet() {
   const picked = [];
   const problems = [];
   data.forEach((row, i) => {
+    if (onlyRow && i + 2 !== onlyRow) return;
     if (row[col('Duyệt')] !== true || row[col('Trạng thái')]) return;
     const date = row[col('Ngày')];
     let ctv = String(row[col('Tên CTV')]).trim();
@@ -706,14 +729,51 @@ function chuyenDonDaDuyet() {
     sortOrdersByDate_(main);
     // Sau khi sắp xếp, số dòng của đơn có thể còn đổi ở lần ghi sau, nên không ghi số dòng ở đây.
     picked.forEach(p => sheet.getRange(p.row, col('Trạng thái') + 1).setValue('Đã chuyển'));
-    appendLog_(aux.log, { mode: 'Duyệt tay', written: picked.length, rows: appended });
+    appendLog_(aux.log, { mode: mode, written: picked.length, rows: appended });
   }
-  ui.alert('Đã chuyển ' + picked.length + ' đơn.' + (problems.length ? '\n\nChưa chuyển:\n' + problems.join('\n') : ''));
+  return { empty: false, moved: picked.length, problems };
+}
+
+/**
+ * Lệnh từ trang xem đơn trên điện thoại (qua doPost, đang giữ khóa):
+ *   { op: 'transfer', row, receivedAt, date: 'YYYY-MM-DD', ctv, text, by } → sửa dòng rồi chuyển sang tab đơn hàng
+ *   { op: 'skip', row, receivedAt, by }                                    → đánh dấu bỏ qua, không chuyển
+ * receivedAt (cột "Nhận lúc") để chắc dòng chưa bị đổi chỗ / xử lý kể từ lúc trang tải danh sách.
+ */
+function reviewAction_(body) {
+  const ss = getSpreadsheet_();
+  const sheet = ensureAuxSheets_(ss).review;
+  const col = name => REVIEW_HEADERS.indexOf(name) + 1;
+  const row = Number(body.row);
+  const by = String(body.by || '').slice(0, 100);
+  const stale = 'Đơn này đã được xử lý hoặc tab Cần kiểm tra vừa thay đổi. Tải lại trang rồi thử lại.';
+  if (!Number.isInteger(row) || row < 2 || row > sheet.getLastRow()) throw new Error(stale);
+
+  const cur = sheet.getRange(row, 1, 1, REVIEW_HEADERS.length).getValues()[0];
+  const at = cur[0] instanceof Date ? Math.round(cur[0].getTime() / 1000) : null;
+  if (at === null || at !== Math.round(Number(body.receivedAt) / 1000) || cur[col('Trạng thái') - 1]) throw new Error(stale);
+
+  if (body.op === 'skip') {
+    sheet.getRange(row, col('Trạng thái')).setValue('Bỏ qua' + (by ? ' (' + by + ')' : ''));
+    return { ok: true, moved: 0, problems: [] };
+  }
+  if (body.op !== 'transfer') throw new Error('Lệnh không hợp lệ.');
+
+  const date = toDate_(String(body.date || ''));
+  if (!date) throw new Error('Ngày không hợp lệ.');
+  sheet.getRange(row, col('Ngày')).setValue(date);
+  sheet.getRange(row, col('Tên CTV')).setValue(String(body.ctv || '').trim().slice(0, 200));
+  sheet.getRange(row, col('Đơn Hàng')).setValue(String(body.text || '').replace(/[ \t ]+$/gm, '').trim().slice(0, CONFIG.MAX_TEXT_LENGTH));
+  sheet.getRange(row, col('Duyệt')).setValue(true);
+
+  const r = transferReviews_(ss, row, 'Duyệt trên điện thoại' + (by ? ' (' + by + ')' : ''));
+  if (!r.moved) sheet.getRange(row, col('Duyệt')).setValue(false); // không chuyển được thì bỏ tick, giữ phần đã sửa
+  return { ok: true, moved: r.moved, problems: r.problems };
 }
 
 /** Sắp xếp các đơn đang có theo ngày (dùng khi anh tự gõ/sửa đơn tay trong tab đơn hàng). */
 function sapXepTheoNgay() {
-  sortOrdersByDate_(getMainSheet_(getSpreadsheet_()));
+  withLock_(() => sortOrdersByDate_(getMainSheet_(getSpreadsheet_())));
   SpreadsheetApp.getUi().alert('Đã sắp xếp các đơn theo ngày.');
 }
 
